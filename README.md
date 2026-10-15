@@ -1,17 +1,16 @@
-# forgemusic
+# Forgemusic
 
-A new Flutter project.
+Forgemusic is a listening room for songs and videos on Android, with YouTube when you want it.
 
-## Getting Started
+## Run
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+A debug package is `flutter build apk --debug`.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+The app asks for music, video, and notification access so it can scan the library and keep playback controls in the notification shade. Tag editing on files outside the app folder needs all-files access, which you turn on from Settings.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+YouTube playback is for personal listening. Respect copyright and YouTube's terms. Downloads stay on the device.

@@ -1,30 +1,60 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:forgemusic/main.dart';
+import 'package:forgemusic/ui/theme/forge_theme.dart';
+import 'package:forgemusic/ui/widgets/forge_widgets.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('empty shelves invite a scan and skip duplicates', (tester) async {
+    var scanned = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: forgeTheme(Brightness.dark, ForgeColors.ember),
+        home: Scaffold(
+          body: EmptyShelves(
+            onScan: () => scanned = true,
+            onYouTube: () {},
+          ),
+        ),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Your shelves are quiet'), findsOneWidget);
+    expect(
+      find.text(
+        'Pick a folder and Forgemusic will line the songs up, skipping duplicates.',
+      ),
+      findsOneWidget,
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.tap(find.text('Scan this phone'));
     await tester.pump();
+    expect(scanned, isTrue);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('a tap on the waveform seeks into the song', (tester) async {
+    Duration? sought;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: forgeTheme(Brightness.dark, ForgeColors.ember),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 200,
+              child: WaveformSeekBar(
+                seed: 'night-drive',
+                position: Duration.zero,
+                duration: const Duration(seconds: 100),
+                onSeek: (value) => sought = value,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(WaveformSeekBar));
+    await tester.pump();
+    expect(sought, isNotNull);
+    expect(sought!.inMilliseconds, greaterThan(0));
   });
 }
