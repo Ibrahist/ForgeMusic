@@ -32,21 +32,18 @@ subprojects {
                 }
                 namespace = declared ?: group.toString()
             }
-            compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_17
-                targetCompatibility = JavaVersion.VERSION_17
-            }
         }
         afterEvaluate {
-            extensions.configure<com.android.build.gradle.LibraryExtension>("android") {
-                compileOptions {
-                    sourceCompatibility = JavaVersion.VERSION_17
-                    targetCompatibility = JavaVersion.VERSION_17
-                }
-            }
+            val target = extensions
+                .getByType(com.android.build.gradle.LibraryExtension::class.java)
+                .compileOptions
+                .targetCompatibility
+                .toString()
             tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
                 compilerOptions {
-                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                    jvmTarget.set(
+                        org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(target),
+                    )
                 }
             }
         }
