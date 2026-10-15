@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -135,7 +136,7 @@ class ArtworkView extends StatelessWidget {
   }
 }
 
-class SongTile extends StatelessWidget {
+class SongTile extends ConsumerWidget {
   const SongTile({
     super.key,
     required this.track,
@@ -152,7 +153,14 @@ class SongTile extends StatelessWidget {
   final String? artPath;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final liveId = ref.watch(playbackProvider.select((async) => async.valueOrNull?.track?.id));
+    final livePlaying = ref.watch(playbackProvider.select((async) => async.valueOrNull?.playing));
+    final fallback = ref.read(playerProvider).snapshot;
+    final currentId = liveId ?? fallback.track?.id;
+    final playing = livePlaying ?? fallback.playing;
+    final current = currentId == track.id;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
       leading: ArtworkView(
@@ -160,11 +168,24 @@ class SongTile extends StatelessWidget {
         url: track.thumbnailUrl,
         radius: 14,
       ),
-      title: Text(
-        track.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+      title: Row(
+        children: [
+          if (current) ...[
+            PlayingBars(playing: playing, height: 14),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(
+              track.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: current ? Theme.of(context).colorScheme.primary : onSurface,
+              ),
+            ),
+          ),
+        ],
       ),
       subtitle: Text(
         subtitle ??
@@ -173,10 +194,144 @@ class SongTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: Theme.of(context).textTheme.bodySmall,
       ),
-      trailing: onMore == null
-          ? null
-          : IconButton(onPressed: onMore, icon: const Icon(Icons.more_horiz)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (current)
+            PlayToggleButton(
+              playing: playing,
+              size: 44,
+              onPressed: () {
+                final player = ref.read(playerProvider);
+                if (playing) {
+                  player.pause();
+                } else {
+                  player.play();
+                }
+              },
+            ),
+          if (onMore != null) IconButton(onPressed: onMore, icon: const Icon(Icons.more_horiz)),
+        ],
+      ),
       onTap: onTap,
+    );
+  }
+}
+
+/// Three bars that mark the song that is actually playing.
+class PlayingBars extends StatefulWidget {
+  const PlayingBars({super.key, required this.playing, this.height = 16, this.color});
+
+  final bool playing;
+  final double height;
+  final Color? color;
+
+  @override
+  State<PlayingBars> createState() => _PlayingBarsState();
+}
+
+class _PlayingBarsState extends State<PlayingBars> with SingleTickerProviderStateMixin {
+  late final AnimationController _motion;
+
+  @override
+  void initState() {
+    super.initState();
+    _motion = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    if (widget.playing) _motion.repeat();
+  }
+
+  @override
+  void didUpdateWidget(PlayingBars oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.playing && !_motion.isAnimating) {
+      _motion.repeat();
+    } else if (!widget.playing && _motion.isAnimating) {
+      _motion.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _motion.dispose();
+    super.dispose();
+  }
+
+  double _barFactor(int index) {
+    if (!widget.playing) return 0.28;
+    final wave = 0.5 + 0.5 * math.sin((_motion.value + index * 0.22) * math.pi * 2);
+    return 0.3 + 0.7 * wave;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.color ?? Theme.of(context).colorScheme.primary;
+    return SizedBox(
+      width: widget.height,
+      height: widget.height,
+      child: AnimatedBuilder(
+        animation: _motion,
+        builder: (context, _) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var i = 0; i < 3; i++)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 1),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        height: widget.height * _barFactor(i),
+                        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// A filled play control. The icon stays on the accent color while a song plays.
+class PlayToggleButton extends StatelessWidget {
+  const PlayToggleButton({
+    super.key,
+    required this.playing,
+    required this.onPressed,
+    this.size = 52,
+  });
+
+  final bool playing;
+  final VoidCallback onPressed;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: playing ? 'Pause' : 'Play',
+      child: Material(
+        color: scheme.primary,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        elevation: 2,
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: const CircleBorder(),
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: Icon(
+              playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: scheme.onPrimary,
+              size: size * 0.62,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -327,8 +482,11 @@ class MiniPlayer extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    IconButton(
-                      tooltip: snapshot.playing ? 'Pause' : 'Play',
+                    PlayingBars(playing: snapshot.playing, height: 18),
+                    const SizedBox(width: 8),
+                    PlayToggleButton(
+                      playing: snapshot.playing,
+                      size: 48,
                       onPressed: () {
                         final player = ref.read(playerProvider);
                         if (snapshot.playing) {
@@ -337,7 +495,6 @@ class MiniPlayer extends ConsumerWidget {
                           player.play();
                         }
                       },
-                      icon: Icon(snapshot.playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
                     ),
                     IconButton(
                       tooltip: 'Next',

@@ -36,15 +36,44 @@ class QueueScreen extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final track = queue[index];
                 final current = snapshot?.index == index;
+                final playing = snapshot?.playing ?? false;
                 return ListTile(
                   key: ValueKey('${track.id}-$index'),
                   selected: current,
                   leading: ArtworkView(path: track.artworkPath, url: track.thumbnailUrl, radius: 12),
-                  title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  title: Row(
+                    children: [
+                      if (current) ...[
+                        PlayingBars(playing: playing, height: 14),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
                   subtitle: Text(track.artist, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => ref.read(playerProvider).removeAt(index),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (current)
+                        PlayToggleButton(
+                          playing: playing,
+                          size: 40,
+                          onPressed: () {
+                            final player = ref.read(playerProvider);
+                            if (playing) {
+                              player.pause();
+                            } else {
+                              player.play();
+                            }
+                          },
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => ref.read(playerProvider).removeAt(index),
+                      ),
+                    ],
                   ),
                   onTap: () => playTracks(context, ref, queue, index),
                 );

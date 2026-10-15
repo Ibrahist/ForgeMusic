@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../data/models/app_settings.dart';
 import '../../data/services/discord_presence.dart';
 import '../../state/providers.dart';
+import '../widgets/equalizer_sheet.dart';
 import '../widgets/forge_widgets.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -76,6 +77,13 @@ class SettingsScreen extends ConsumerWidget {
             title: const Text('Fade out the sleep timer'),
             value: settings.sleepFade,
             onChanged: (value) => save(settings.copyWith(sleepFade: value)),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.graphic_eq),
+            title: const Text('Equalizer'),
+            subtitle: Text(settings.equalizer ? 'On' : 'Off'),
+            onTap: () => showEqualizerSheet(context),
           ),
           const _Heading('YouTube'),
           SwitchListTile(

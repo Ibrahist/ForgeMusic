@@ -12,6 +12,7 @@ import '../../player/player_snapshot.dart';
 import '../../state/providers.dart';
 import '../theme/forge_theme.dart';
 import '../widgets/canvas_stage.dart';
+import '../widgets/equalizer_sheet.dart';
 import '../widgets/forge_widgets.dart';
 import '../widgets/synced_lyrics.dart';
 import '../playback.dart';
@@ -44,7 +45,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               )
-            : ListView(
+            : Column(
+                children: [
+                  Expanded(
+                    child: ListView(
                 padding: const EdgeInsets.fromLTRB(22, 8, 22, 28),
                 children: [
                   Row(
@@ -103,47 +107,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   ],
                   const SizedBox(height: 8),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        tooltip: 'Shuffle',
-                        onPressed: () => ref.read(playerProvider).toggleShuffle(),
-                        icon: Icon(Icons.shuffle, color: snapshot.shuffle ? Theme.of(context).colorScheme.primary : null),
-                      ),
-                      IconButton(
-                        iconSize: 36,
-                        onPressed: () => ref.read(playerProvider).skipToPrevious(),
-                        icon: const Icon(Icons.skip_previous_rounded),
-                      ),
-                      FilledButton(
-                        style: FilledButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(16)),
-                        onPressed: () {
-                          final player = ref.read(playerProvider);
-                          if (snapshot.playing) {
-                            player.pause();
-                          } else {
-                            player.play();
-                          }
-                        },
-                        child: Icon(snapshot.playing ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 36),
-                      ),
-                      IconButton(
-                        iconSize: 36,
-                        onPressed: () => ref.read(playerProvider).skipToNext(),
-                        icon: const Icon(Icons.skip_next_rounded),
-                      ),
-                      IconButton(
-                        tooltip: 'Repeat',
-                        onPressed: () => ref.read(playerProvider).cycleRepeat(),
-                        icon: Icon(
-                          snapshot.repeat == RepeatMode.one ? Icons.repeat_one : Icons.repeat,
-                          color: snapshot.repeat == RepeatMode.off ? null : Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
                     children: [
                       TextButton.icon(
                         onPressed: () => _sleep(snapshot.sleepEndOfTrack),
@@ -177,8 +140,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     position: snapshot.position,
                     expanded: _lyricsOpen,
                   ),
-                ],
-              ),
+                    ],
+                  ),
+                ),
+                _Transport(snapshot: snapshot),
+              ],
+            ),
       ),
     );
   }
@@ -241,6 +208,83 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       final color = palette.vibrantColor?.color ?? palette.dominantColor?.color;
       if (color != null) ref.read(accentProvider.notifier).apply(color);
     } catch (_) {}
+  }
+}
+
+/// Shuffle, play, and repeat stay on screen while the cover scrolls.
+class _Transport extends ConsumerWidget {
+  const _Transport({required this.snapshot});
+
+  final PlayerSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final player = ref.read(playerProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final equalizerOn = ref.watch(settingsProvider.select((settings) => settings.equalizer));
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: ForgeColors.card(context),
+        border: Border(top: BorderSide(color: scheme.primary.withValues(alpha: 0.55))),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  tooltip: 'Shuffle',
+                  onPressed: player.toggleShuffle,
+                  icon: Icon(Icons.shuffle, color: snapshot.shuffle ? scheme.primary : scheme.onSurface),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Previous',
+                  iconSize: 34,
+                  onPressed: player.skipToPrevious,
+                  icon: Icon(Icons.skip_previous_rounded, color: scheme.onSurface),
+                ),
+                const SizedBox(width: 10),
+                PlayToggleButton(
+                  playing: snapshot.playing,
+                  size: 68,
+                  onPressed: () {
+                    if (snapshot.playing) {
+                      player.pause();
+                    } else {
+                      player.play();
+                    }
+                  },
+                ),
+                const SizedBox(width: 10),
+                IconButton(
+                  tooltip: 'Next',
+                  iconSize: 34,
+                  onPressed: player.skipToNext,
+                  icon: Icon(Icons.skip_next_rounded, color: scheme.onSurface),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Repeat',
+                  onPressed: player.cycleRepeat,
+                  icon: Icon(
+                    snapshot.repeat == RepeatMode.one ? Icons.repeat_one : Icons.repeat,
+                    color: snapshot.repeat == RepeatMode.off ? scheme.onSurface : scheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            TextButton.icon(
+              onPressed: () => showEqualizerSheet(context),
+              icon: Icon(Icons.graphic_eq, color: equalizerOn ? scheme.primary : scheme.onSurface),
+              label: Text(equalizerOn ? 'Equalizer on' : 'Equalizer'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

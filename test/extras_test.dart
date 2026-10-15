@@ -80,6 +80,21 @@ void main() {
     expect(highest.copyWith(audioQuality: AudioQuality.saver).dataSaver, isTrue);
   });
 
+  test('equalizer bands round trip and stay inside the gain range', () {
+    final stored = AppSettings.fromJson({
+      'equalizer': true,
+      'equalizerBands': [6, 4, 1, 0, 99],
+    });
+    expect(stored.equalizer, isTrue);
+    expect(stored.equalizerBands, [6, 4, 1, 0, 12]);
+    final again = AppSettings.fromJson(Map<String, dynamic>.from(stored.toJson()));
+    expect(again.equalizer, isTrue);
+    expect(again.equalizerBands, stored.equalizerBands);
+    expect(AppSettings.defaults.equalizer, isFalse);
+    expect(equalizerBandsFrom(['nope', -20]), [-12, 0, 0, 0, 0]);
+    expect(equalizerBandsFrom(null), equalizerFlat);
+  });
+
   test('discord updates only accept a channel webhook', () {
     expect(
       discordWebhookAllowed('https://discord.com/api/webhooks/123/abc'),

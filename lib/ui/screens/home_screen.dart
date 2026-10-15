@@ -11,6 +11,7 @@ import '../../data/models/track.dart';
 import '../../state/providers.dart';
 import '../playback.dart';
 import '../theme/forge_theme.dart';
+import '../widgets/equalizer_sheet.dart';
 import '../widgets/forge_widgets.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -277,6 +278,7 @@ class _NowPlaying extends ConsumerWidget {
     final snapshot = ref.watch(playbackProvider).valueOrNull ?? ref.read(playerProvider).snapshot;
     final track = snapshot.track;
     if (track == null) return const SizedBox.shrink();
+    final equalizerOn = ref.watch(settingsProvider.select((settings) => settings.equalizer));
     return Padding(
       padding: const EdgeInsets.only(top: 18),
       child: NowPlayingCard(
@@ -284,7 +286,9 @@ class _NowPlaying extends ConsumerWidget {
         playing: snapshot.playing,
         position: snapshot.position,
         duration: snapshot.duration ?? track.duration,
+        equalizerOn: equalizerOn,
         onOpen: () => context.push('/player'),
+        onEqualizer: () => showEqualizerSheet(context),
         onToggle: () {
           final player = ref.read(playerProvider);
           if (snapshot.playing) {
@@ -308,6 +312,8 @@ class NowPlayingCard extends StatelessWidget {
     required this.duration,
     required this.onOpen,
     required this.onToggle,
+    this.onEqualizer,
+    this.equalizerOn = false,
   });
 
   final Track track;
@@ -316,6 +322,8 @@ class NowPlayingCard extends StatelessWidget {
   final Duration duration;
   final VoidCallback onOpen;
   final VoidCallback onToggle;
+  final VoidCallback? onEqualizer;
+  final bool equalizerOn;
 
   @override
   Widget build(BuildContext context) {
@@ -367,11 +375,20 @@ class NowPlayingCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: playing ? 'Pause' : 'Play',
-                    iconSize: 36,
-                    onPressed: onToggle,
-                    icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                  Column(
+                    children: [
+                      PlayToggleButton(playing: playing, size: 56, onPressed: onToggle),
+                      if (onEqualizer != null)
+                        IconButton(
+                          tooltip: 'Equalizer',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: onEqualizer,
+                          icon: Icon(
+                            Icons.graphic_eq,
+                            color: equalizerOn ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -631,7 +648,7 @@ class _TrackStrip extends StatelessWidget {
   }
 }
 
-class _TrackCard extends StatelessWidget {
+class _TrackCard extends ConsumerWidget {
   const _TrackCard({required this.track, required this.subtitle, required this.onTap});
 
   final Track track;
@@ -639,7 +656,13 @@ class _TrackCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final liveId = ref.watch(playbackProvider.select((async) => async.valueOrNull?.track?.id));
+    final livePlaying = ref.watch(playbackProvider.select((async) => async.valueOrNull?.playing));
+    final fallback = ref.read(playerProvider).snapshot;
+    final current = (liveId ?? fallback.track?.id) == track.id;
+    final playing = livePlaying ?? fallback.playing;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return SizedBox(
       width: 132,
       child: InkWell(
@@ -648,13 +671,37 @@ class _TrackCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ArtworkView(path: track.artworkPath, url: track.thumbnailUrl, size: 132, radius: 18),
+            Stack(
+              children: [
+                ArtworkView(path: track.artworkPath, url: track.thumbnailUrl, size: 132, radius: 18),
+                if (current)
+                  Positioned(
+                    right: 6,
+                    bottom: 6,
+                    child: PlayToggleButton(
+                      playing: playing,
+                      size: 42,
+                      onPressed: () {
+                        final player = ref.read(playerProvider);
+                        if (playing) {
+                          player.pause();
+                        } else {
+                          player.play();
+                        }
+                      },
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 8),
             Text(
               track.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 14),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontSize: 14,
+                color: current ? Theme.of(context).colorScheme.primary : onSurface,
+              ),
             ),
             Text(
               subtitle,

@@ -114,4 +114,34 @@ void main() {
     await tester.pump();
     expect(toggled, isTrue);
   });
+
+  testWidgets('the play control stays filled while a song plays', (tester) async {
+    final theme = forgeTheme(Brightness.dark, ForgeColors.ember);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: const Scaffold(
+          body: Center(
+            child: PlayToggleButton(playing: true, onPressed: _noop),
+          ),
+        ),
+      ),
+    );
+
+    final icon = tester.widget<Icon>(find.byIcon(Icons.pause_rounded));
+    expect(icon.color, theme.colorScheme.onPrimary);
+    expect(icon.color, isNot(theme.colorScheme.surface));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: const Scaffold(
+          body: Center(child: PlayingBars(playing: true, height: 18)),
+        ),
+      ),
+    );
+    expect(tester.getSize(find.byType(PlayingBars)), const Size(18, 18));
+  });
 }
+
+void _noop() {}

@@ -1,5 +1,18 @@
 import 'package:flutter/material.dart';
 
+/// A flat five-band equalizer. Low frequencies come first.
+const equalizerFlat = [0.0, 0.0, 0.0, 0.0, 0.0];
+
+const equalizerBandLabels = ['60 Hz', '230 Hz', '910 Hz', '3.6 kHz', '14 kHz'];
+
+List<double> equalizerBandsFrom(Object? raw) {
+  final parsed = raw is List ? raw.whereType<num>().map((value) => value.toDouble()).toList() : const <double>[];
+  return List<double>.generate(
+    equalizerFlat.length,
+    (index) => index < parsed.length ? parsed[index].clamp(-12, 12).toDouble() : 0,
+  );
+}
+
 /// How large a YouTube audio stream Forgemusic should ask for.
 enum AudioQuality { saver, balanced, highest }
 
@@ -45,6 +58,8 @@ class AppSettings {
     required this.canvasMotion,
     required this.discordWebhook,
     required this.discordShare,
+    required this.equalizer,
+    required this.equalizerBands,
   });
 
   final ThemeMode themeMode;
@@ -66,6 +81,10 @@ class AppSettings {
   final bool canvasMotion;
   final String discordWebhook;
   final bool discordShare;
+  final bool equalizer;
+
+  /// Five band gains in decibels, low frequency first.
+  final List<double> equalizerBands;
 
   static const defaults = AppSettings(
     themeMode: ThemeMode.dark,
@@ -87,6 +106,8 @@ class AppSettings {
     canvasMotion: true,
     discordWebhook: '',
     discordShare: false,
+    equalizer: false,
+    equalizerBands: equalizerFlat,
   );
 
   AppSettings copyWith({
@@ -109,6 +130,8 @@ class AppSettings {
     bool? canvasMotion,
     String? discordWebhook,
     bool? discordShare,
+    bool? equalizer,
+    List<double>? equalizerBands,
   }) {
     var quality = audioQuality ?? this.audioQuality;
     var saver = dataSaver ?? this.dataSaver;
@@ -141,6 +164,8 @@ class AppSettings {
       canvasMotion: canvasMotion ?? this.canvasMotion,
       discordWebhook: discordWebhook ?? this.discordWebhook,
       discordShare: discordShare ?? this.discordShare,
+      equalizer: equalizer ?? this.equalizer,
+      equalizerBands: equalizerBands ?? this.equalizerBands,
     );
   }
 
@@ -164,6 +189,8 @@ class AppSettings {
     'canvasMotion': canvasMotion,
     'discordWebhook': discordWebhook,
     'discordShare': discordShare,
+    'equalizer': equalizer,
+    'equalizerBands': equalizerBands,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -190,6 +217,8 @@ class AppSettings {
       canvasMotion: json['canvasMotion'] as bool? ?? true,
       discordWebhook: json['discordWebhook'] as String? ?? '',
       discordShare: json['discordShare'] as bool? ?? false,
+      equalizer: json['equalizer'] as bool? ?? false,
+      equalizerBands: equalizerBandsFrom(json['equalizerBands']),
     );
   }
 }

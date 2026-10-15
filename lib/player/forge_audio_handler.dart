@@ -26,10 +26,11 @@ import '../data/services/sponsor_client.dart';
 import 'player_snapshot.dart';
 
 class _Deck {
-  _Deck(this.player, this.enhancer);
+  _Deck(this.player, this.enhancer, this.equalizer);
 
   final AudioPlayer player;
   final AndroidLoudnessEnhancer enhancer;
+  final AndroidEqualizer equalizer;
   Track? track;
   GainPlan gain = GainPlan.unity;
   String? videoId;
@@ -118,14 +119,15 @@ class ForgeAudioHandler extends BaseAudioHandler {
 
   _Deck _openDeck() {
     final enhancer = AndroidLoudnessEnhancer();
+    final equalizer = AndroidEqualizer();
     final player = AudioPlayer(
       userAgent: streamUserAgent,
       handleInterruptions: false,
       handleAudioSessionActivation: false,
       useProxyForRequestHeaders: false,
-      audioPipeline: AudioPipeline(androidAudioEffects: [enhancer]),
+      audioPipeline: AudioPipeline(androidAudioEffects: [equalizer, enhancer]),
     );
-    return _Deck(player, enhancer);
+    return _Deck(player, enhancer, equalizer);
   }
 
   _Deck get _spare => identical(_live, _left) ? _right : _left;
@@ -377,6 +379,29 @@ class ForgeAudioHandler extends BaseAudioHandler {
     });
   }
 
+  Future<void> _applyEqualizer(_Deck deck) async {
+    try {
+      await deck.equalizer.setEnabled(_settings.equalizer);
+    } catch (_) {
+      return;
+    }
+    if (!_settings.equalizer || !Platform.isAndroid) return;
+    AndroidEqualizerParameters params;
+    try {
+      params = await deck.equalizer.parameters.timeout(const Duration(seconds: 2));
+    } catch (_) {
+      return;
+    }
+    final gains = _settings.equalizerBands;
+    final count = math.min(params.bands.length, gains.length);
+    for (var i = 0; i < count; i++) {
+      final gain = gains[i].clamp(params.minDecibels, params.maxDecibels).toDouble();
+      try {
+        await params.bands[i].setGain(gain);
+      } catch (_) {}
+    }
+  }
+
   Future<void> applySettings(AppSettings settings) {
     return _sync(() async {
       _settings = settings;
@@ -390,6 +415,7 @@ class ForgeAudioHandler extends BaseAudioHandler {
         );
         await deck.enhancer.setTargetGain(deck.gain.enhancerDb);
         await deck.enhancer.setEnabled(deck.gain.enhancerDb > 0);
+        await _applyEqualizer(deck);
         if (Platform.isAndroid) {
           try {
             await deck.player.setSkipSilenceEnabled(settings.skipSilence);
@@ -536,6 +562,7 @@ class ForgeAudioHandler extends BaseAudioHandler {
       );
       await deck.enhancer.setTargetGain(deck.gain.enhancerDb);
       await deck.enhancer.setEnabled(deck.gain.enhancerDb > 0);
+      await _applyEqualizer(deck);
       if (Platform.isAndroid) {
         try {
           await deck.player.setSkipSilenceEnabled(_settings.skipSilence);
