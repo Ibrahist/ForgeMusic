@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:forgemusic/data/models/track.dart';
+import 'package:forgemusic/ui/screens/home_screen.dart';
 import 'package:forgemusic/ui/theme/forge_theme.dart';
 import 'package:forgemusic/ui/widgets/forge_widgets.dart';
 
@@ -56,5 +58,58 @@ void main() {
     await tester.pump();
     expect(sought, isNotNull);
     expect(sought!.inMilliseconds, greaterThan(0));
+  });
+
+  test('song titles stay on the surface color', () {
+    final theme = forgeTheme(Brightness.dark, ForgeColors.ember);
+    expect(theme.textTheme.bodyMedium?.color, ForgeColors.paper);
+    expect(theme.textTheme.titleMedium?.color, ForgeColors.paper);
+    expect(theme.textTheme.bodySmall?.color, ForgeColors.mist);
+  });
+
+  testWidgets('the current song stays visible on the now playing card', (tester) async {
+    var opened = false;
+    var toggled = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: forgeTheme(Brightness.dark, ForgeColors.ember),
+        home: Scaffold(
+          body: NowPlayingCard(
+            track: Track(
+              id: 'night-drive',
+              source: TrackSource.local,
+              title: 'Night Drive',
+              artist: 'Ada',
+              album: 'Night',
+              albumArtist: 'Ada',
+              genre: 'Pop',
+              durationMs: 180000,
+              sizeBytes: 1000,
+              addedMs: 1,
+              fingerprint: 'night-drive',
+            ),
+            playing: true,
+            position: const Duration(seconds: 20),
+            duration: const Duration(minutes: 3),
+            onOpen: () => opened = true,
+            onToggle: () => toggled = true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Now playing'), findsOneWidget);
+    expect(find.text('Night Drive'), findsOneWidget);
+    expect(find.text('Ada'), findsOneWidget);
+    final title = tester.widget<Text>(find.text('Night Drive'));
+    expect(title.style?.color, ForgeColors.paper);
+
+    await tester.tap(find.text('Night Drive'));
+    await tester.pump();
+    expect(opened, isTrue);
+
+    await tester.tap(find.byTooltip('Pause'));
+    await tester.pump();
+    expect(toggled, isTrue);
   });
 }

@@ -56,9 +56,10 @@ ThemeData forgeTheme(Brightness brightness, Color accent) {
       displaySmall: titles.copyWith(fontSize: 40, height: 1.05),
       headlineSmall: titles.copyWith(fontSize: 28, height: 1.1),
       titleLarge: titles.copyWith(fontSize: 22),
-      titleMedium: outfit.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
-      bodyLarge: outfit.copyWith(fontSize: 16, height: 1.4),
-      bodyMedium: outfit.copyWith(fontSize: 14, height: 1.4, color: ForgeColors.mist),
+      titleMedium: outfit.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+      bodyLarge: outfit.copyWith(fontSize: 16, height: 1.4, color: scheme.onSurface),
+      bodyMedium: outfit.copyWith(fontSize: 14, height: 1.4, color: scheme.onSurface),
+      bodySmall: outfit.copyWith(fontSize: 13, height: 1.3, color: ForgeColors.mist),
       labelLarge: outfit.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
     ),
     appBarTheme: AppBarTheme(

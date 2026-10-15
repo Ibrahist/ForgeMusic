@@ -29,16 +29,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final snapshot = ref.watch(playbackProvider).valueOrNull;
-    final track = snapshot?.track;
+    final snapshot = ref.watch(playbackProvider).valueOrNull ?? ref.read(playerProvider).snapshot;
+    final track = snapshot.track;
     if (track != null && track.id != _paintedId && ref.read(settingsProvider).dynamicColor) {
       _paintedId = track.id;
       Future<void>.microtask(() => _paint(track));
     }
     return Scaffold(
       body: SafeArea(
-        child: track == null || snapshot == null
-            ? const Center(child: Text('Nothing is playing yet.'))
+        child: track == null
+            ? Center(
+                child: Text(
+                  'Nothing is playing yet.',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              )
             : ListView(
                 padding: const EdgeInsets.fromLTRB(22, 8, 22, 28),
                 children: [
@@ -49,12 +54,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       IconButton(onPressed: () => context.push('/queue'), icon: const Icon(Icons.queue_music)),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Center(child: CanvasStage(track: track)),
-                  const SizedBox(height: 26),
-                  Text(track.title, style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 12),
+                  Text(
+                    track.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
                   const SizedBox(height: 4),
-                  Text(track.artist),
+                  Text(
+                    track.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: ForgeColors.mist),
+                  ),
                   if (snapshot.offline) ...[
                     const SizedBox(height: 6),
                     Text(
@@ -63,8 +76,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     ),
                   ] else if (snapshot.streamBits != null && snapshot.streamBits! > 0) ...[
                     const SizedBox(height: 6),
-                    Text('${(snapshot.streamBits! / 1000).round()} kbps'),
+                    Text(
+                      '${(snapshot.streamBits! / 1000).round()} kbps',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
+                  const SizedBox(height: 16),
+                  Center(child: CanvasStage(track: track, size: 220)),
                   const SizedBox(height: 18),
                   WaveformSeekBar(
                     seed: track.id,

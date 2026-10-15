@@ -160,12 +160,18 @@ class SongTile extends StatelessWidget {
         url: track.thumbnailUrl,
         radius: 14,
       ),
-      title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Text(
+        track.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+      ),
       subtitle: Text(
         subtitle ??
             '${track.artist} · ${formatDuration(track.duration)}${track.downloaded ? ' · On this phone' : ''}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.bodySmall,
       ),
       trailing: onMore == null
           ? null
@@ -264,51 +270,85 @@ class MiniPlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final snapshot = ref.watch(playbackProvider).valueOrNull;
-    final track = snapshot?.track;
-    if (snapshot == null || track == null) return const SizedBox.shrink();
+    final snapshot = ref.watch(playbackProvider).valueOrNull ?? ref.read(playerProvider).snapshot;
+    final track = snapshot.track;
+    if (track == null) return const SizedBox.shrink();
     final total = snapshot.duration?.inMilliseconds ?? track.durationMs;
     final progress = total <= 0 ? 0.0 : (snapshot.position.inMilliseconds / total).clamp(0, 1).toDouble();
     final accent = Theme.of(context).colorScheme.primary;
-    return Material(
-      color: ForgeColors.card(context),
-      child: InkWell(
-        onTap: () => context.push('/player'),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            LinearProgressIndicator(value: progress, minHeight: 2, color: accent),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-              child: Row(
-                children: [
-                  ArtworkView(path: track.artworkPath, url: track.thumbnailUrl, size: 46, radius: 12),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        Text(track.artist, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: snapshot.playing ? 'Pause' : 'Play',
-                    onPressed: () {
-                      final player = ref.read(playerProvider);
-                      if (snapshot.playing) {
-                        player.pause();
-                      } else {
-                        player.play();
-                      }
-                    },
-                    icon: Icon(snapshot.playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                  ),
-                ],
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+      child: Material(
+        color: ForgeColors.card(context),
+        elevation: 6,
+        shadowColor: Colors.black87,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: accent.withValues(alpha: 0.55)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => context.push('/player'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LinearProgressIndicator(
+                value: progress,
+                minHeight: 3,
+                color: accent,
+                backgroundColor: ForgeColors.mist.withValues(alpha: 0.28),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+                child: Row(
+                  children: [
+                    ArtworkView(path: track.artworkPath, url: track.thumbnailUrl, size: 48, radius: 12),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            track.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: onSurface,
+                              fontSize: 15,
+                            ),
+                          ),
+                          Text(
+                            track.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: snapshot.playing ? 'Pause' : 'Play',
+                      onPressed: () {
+                        final player = ref.read(playerProvider);
+                        if (snapshot.playing) {
+                          player.pause();
+                        } else {
+                          player.play();
+                        }
+                      },
+                      icon: Icon(snapshot.playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                    ),
+                    IconButton(
+                      tooltip: 'Next',
+                      onPressed: () => ref.read(playerProvider).skipToNext(),
+                      icon: const Icon(Icons.skip_next_rounded),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

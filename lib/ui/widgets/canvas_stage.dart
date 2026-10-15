@@ -12,9 +12,10 @@ import 'forge_widgets.dart';
 
 /// A looping clip the listener attached, or a slow move across the cover.
 class CanvasStage extends ConsumerStatefulWidget {
-  const CanvasStage({super.key, required this.track});
+  const CanvasStage({super.key, required this.track, this.size = 320});
 
   final Track track;
+  final double size;
 
   @override
   ConsumerState<CanvasStage> createState() => _CanvasStageState();
@@ -108,10 +109,10 @@ class _CanvasStageState extends ConsumerState<CanvasStage> with SingleTickerProv
               child: VideoPlayer(video),
             ),
           )
-        : _Still(track: widget.track, motion: motion ? _motion : null);
+        : _Still(track: widget.track, motion: motion ? _motion : null, size: widget.size);
     return SizedBox(
-      width: 320,
-      height: 320,
+      width: widget.size,
+      height: widget.size,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
@@ -151,14 +152,15 @@ class _CanvasStageState extends ConsumerState<CanvasStage> with SingleTickerProv
 }
 
 class _Still extends StatelessWidget {
-  const _Still({required this.track, required this.motion});
+  const _Still({required this.track, required this.motion, required this.size});
 
   final Track track;
   final Animation<double>? motion;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    final art = ArtworkView(path: track.artworkPath, url: track.thumbnailUrl, size: 320, radius: 0);
+    final art = ArtworkView(path: track.artworkPath, url: track.thumbnailUrl, size: size, radius: 0);
     final animation = motion;
     if (animation == null) return art;
     return AnimatedBuilder(
