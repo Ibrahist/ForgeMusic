@@ -81,12 +81,11 @@ flutter:
   uses-material-design: true
 
   fonts:
-    - family: Outfit
+    - family: Instrument Sans
       fonts:
-        - asset: assets/fonts/Outfit.ttf
-    - family: Fraunces
-      fonts:
-        - asset: assets/fonts/Fraunces.ttf
+        - asset: assets/fonts/InstrumentSans-Variable.ttf
+        - asset: assets/fonts/InstrumentSans-Italic-Variable.ttf
+          style: italic
 
   # To add assets to your application, add an assets section, like this:
   # assets:

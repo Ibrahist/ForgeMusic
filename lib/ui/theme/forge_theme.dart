@@ -40,27 +40,23 @@ ThemeData forgeTheme(Brightness brightness, Color accent) {
     error: ForgeColors.danger,
     onError: Colors.white,
   );
-  const outfit = TextStyle(fontFamily: 'Outfit');
-  final titles = TextStyle(
-    fontFamily: 'Fraunces',
-    fontWeight: FontWeight.w600,
-    color: scheme.onSurface,
-  );
+  const instrument = TextStyle(fontFamily: 'Instrument Sans');
+  final titles = instrument.copyWith(fontWeight: FontWeight.w600, color: scheme.onSurface);
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
     colorScheme: scheme,
     scaffoldBackgroundColor: dark ? ForgeColors.night : ForgeColors.paper,
-    fontFamily: 'Outfit',
+    fontFamily: 'Instrument Sans',
     textTheme: TextTheme(
       displaySmall: titles.copyWith(fontSize: 40, height: 1.05),
       headlineSmall: titles.copyWith(fontSize: 28, height: 1.1),
       titleLarge: titles.copyWith(fontSize: 22),
-      titleMedium: outfit.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
-      bodyLarge: outfit.copyWith(fontSize: 16, height: 1.4, color: scheme.onSurface),
-      bodyMedium: outfit.copyWith(fontSize: 14, height: 1.4, color: scheme.onSurface),
-      bodySmall: outfit.copyWith(fontSize: 13, height: 1.3, color: ForgeColors.mist),
-      labelLarge: outfit.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+      titleMedium: instrument.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: scheme.onSurface),
+      bodyLarge: instrument.copyWith(fontSize: 16, height: 1.4, color: scheme.onSurface),
+      bodyMedium: instrument.copyWith(fontSize: 14, height: 1.4, color: scheme.onSurface),
+      bodySmall: instrument.copyWith(fontSize: 13, height: 1.3, color: ForgeColors.mist),
+      labelLarge: instrument.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
@@ -75,7 +71,7 @@ ThemeData forgeTheme(Brightness brightness, Color accent) {
       indicatorColor: accent.withValues(alpha: 0.24),
       height: 68,
       labelTextStyle: WidgetStateProperty.all(
-        const TextStyle(fontFamily: 'Outfit', fontSize: 12, fontWeight: FontWeight.w600),
+        const TextStyle(fontFamily: 'Instrument Sans', fontSize: 12, fontWeight: FontWeight.w600),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -83,7 +79,7 @@ ThemeData forgeTheme(Brightness brightness, Color accent) {
         backgroundColor: accent,
         foregroundColor: dark ? const Color(0xFF1A120C) : Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-        textStyle: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(fontFamily: 'Instrument Sans', fontWeight: FontWeight.w600),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
     ),
@@ -95,7 +91,7 @@ ThemeData forgeTheme(Brightness brightness, Color accent) {
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: dark ? ForgeColors.nightCard : ForgeColors.ink,
-      contentTextStyle: const TextStyle(fontFamily: 'Outfit', color: ForgeColors.paper),
+      contentTextStyle: const TextStyle(fontFamily: 'Instrument Sans', color: ForgeColors.paper),
     ),
     dividerTheme: DividerThemeData(color: ForgeColors.mist.withValues(alpha: 0.22)),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: accent),

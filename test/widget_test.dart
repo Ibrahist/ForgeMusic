@@ -62,6 +62,8 @@ void main() {
 
   test('song titles stay on the surface color', () {
     final theme = forgeTheme(Brightness.dark, ForgeColors.ember);
+    expect(theme.textTheme.displaySmall?.fontFamily, 'Instrument Sans');
+    expect(theme.textTheme.bodyMedium?.fontFamily, 'Instrument Sans');
     expect(theme.textTheme.bodyMedium?.color, ForgeColors.paper);
     expect(theme.textTheme.titleMedium?.color, ForgeColors.paper);
     expect(theme.textTheme.bodySmall?.color, ForgeColors.mist);
