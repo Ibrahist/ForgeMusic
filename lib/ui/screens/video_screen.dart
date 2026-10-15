@@ -85,6 +85,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
 
   @override
   void dispose() {
+    _controller?.removeListener(_onTick);
     _controller?.dispose();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -276,9 +277,16 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
                   ),
                   const Spacer(),
                   if (_votes != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: Text(_votes!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    Flexible(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: Text(
+                          _votes!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ),
                     ),
                 ],
               ),
