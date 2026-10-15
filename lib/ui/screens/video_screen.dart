@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/app_failure.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/skip_window.dart';
 import '../../state/providers.dart';
 import '../theme/forge_theme.dart';
 
@@ -26,6 +28,10 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
   bool _showVolume = false;
   String? _seekHint;
   double _doubleTapX = 0;
+  List<SkipSegment> _segments = const [];
+  Duration? _skipUntil;
+  Duration? _previous;
+  String? _votes;
 
   @override
   void initState() {
@@ -59,9 +65,11 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
       }
       await controller.initialize();
       await controller.play();
-      controller.addListener(() {
-        if (mounted) setState(() {});
-      });
+      controller.addListener(_onTick);
+      final youtubeId = launch.youtubeId;
+      if (youtubeId != null) {
+        unawaited(_loadExtras(youtubeId));
+      }
       if (!mounted) {
         await controller.dispose();
         return;
@@ -82,6 +90,45 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     ref.read(deviceProvider).keepScreenOn(false);
     super.dispose();
+  }
+
+  Future<void> _loadExtras(String videoId) async {
+    final votes = await ref.read(dislikeProvider).votes(videoId);
+    final segments = await ref.read(sponsorProvider).segments(videoId);
+    if (!mounted) return;
+    setState(() {
+      _segments = segments;
+      if (votes != null) {
+        _votes = '${formatCount(votes.likes)} likes · ${formatCount(votes.dislikes)} dislikes';
+      }
+    });
+  }
+
+  void _onTick() {
+    final controller = _controller;
+    if (controller == null || !mounted) return;
+    final position = controller.value.position;
+    final skip = ref.read(settingsProvider).sponsorBlock;
+    if (skip && _segments.isNotEmpty) {
+      final previous = _previous;
+      final jumpedBack = previous != null && position + const Duration(seconds: 1) < previous;
+      _previous = position;
+      if (jumpedBack) _skipUntil = null;
+      if (_skipUntil != null && position < _skipUntil!) {
+        setState(() {});
+        return;
+      }
+      _skipUntil = null;
+      final jump = nextSkip(_segments, position);
+      if (jump != null) {
+        _skipUntil = jump;
+        controller.seekTo(jump);
+        _seekHint = 'Skipped';
+      }
+    } else {
+      _previous = position;
+    }
+    setState(() {});
   }
 
   void _seekBy(int seconds) {
@@ -186,6 +233,7 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
 
   Widget _bar(VideoPlayerController controller, String title) {
     final value = controller.value;
+    final youtube = ref.read(videoLaunchProvider)?.youtubeId != null;
     return Align(
       alignment: Alignment.bottomCenter,
       child: DecoratedBox(
@@ -226,8 +274,22 @@ class _VideoScreenState extends ConsumerState<VideoScreen> {
                     '${formatDuration(value.position)} / ${formatDuration(value.duration)}',
                     style: const TextStyle(color: Colors.white),
                   ),
+                  const Spacer(),
+                  if (_votes != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Text(_votes!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    ),
                 ],
               ),
+              if (youtube)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text(
+                    'Dislike counts are estimates from Return YouTube Dislike.',
+                    style: TextStyle(color: Colors.white54, fontSize: 11),
+                  ),
+                ),
             ],
           ),
         ),

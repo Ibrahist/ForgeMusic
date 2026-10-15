@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../core/app_failure.dart';
 import '../../core/utils/cache_policy.dart';
 import '../db/app_database.dart';
+import '../models/app_settings.dart';
 import '../models/media.dart';
 import 'youtube_service.dart';
 
@@ -31,12 +32,13 @@ class DownloadManager {
   Future<DownloadRecord> download(
     YoutubeHit hit, {
     required bool audioOnly,
+    required AudioQuality audioQuality,
     required bool dataSaver,
   }) async {
     _progress.add(TransferProgress(label: 'Saving ${hit.title}', fraction: null));
     try {
       final chosen = audioOnly
-          ? await _youtube.chooseAudio(hit.videoId, dataSaver: dataSaver)
+          ? await _youtube.chooseAudio(hit.videoId, quality: audioQuality)
           : await _youtube.chooseVideo(hit.videoId, dataSaver: dataSaver);
       final dir = await _folder('downloads');
       final file = File(p.join(dir.path, '${hit.videoId}-${audioOnly ? 'audio' : 'video'}.${chosen.extension}'));

@@ -14,6 +14,8 @@ class PlayerSnapshot {
     required this.sleepEndsAt,
     required this.sleepEndOfTrack,
     this.message,
+    this.offline = false,
+    this.streamBits,
   });
 
   final List<Track> queue;
@@ -27,6 +29,8 @@ class PlayerSnapshot {
   final DateTime? sleepEndsAt;
   final bool sleepEndOfTrack;
   final String? message;
+  final bool offline;
+  final int? streamBits;
 
   static const empty = PlayerSnapshot(
     queue: [],

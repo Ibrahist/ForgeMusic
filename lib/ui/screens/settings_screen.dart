@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../data/models/app_settings.dart';
+import '../../data/services/discord_presence.dart';
 import '../../state/providers.dart';
 import '../widgets/forge_widgets.dart';
 
@@ -83,14 +84,35 @@ class SettingsScreen extends ConsumerWidget {
             value: settings.youtubeAudioOnly,
             onChanged: (value) => save(settings.copyWith(youtubeAudioOnly: value)),
           ),
+          const SizedBox(height: 8),
+          Text('Audio quality', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          const Text('Saver is about 64 kbps and also picks a smaller video. Balanced stays near 160 kbps. Highest takes the largest audio stream. Saved streams play again from this phone.'),
+          const SizedBox(height: 8),
+          SegmentedButton<AudioQuality>(
+            segments: const [
+              ButtonSegment(value: AudioQuality.saver, label: Text('Saver')),
+              ButtonSegment(value: AudioQuality.balanced, label: Text('Balanced')),
+              ButtonSegment(value: AudioQuality.highest, label: Text('Highest')),
+            ],
+            selected: {settings.audioQuality},
+            onSelectionChanged: (value) => save(settings.copyWith(audioQuality: value.first)),
+          ),
           SwitchListTile(
-            title: const Text('Data saver'),
-            subtitle: const Text('Picks a smaller stream, around 64 kbps for audio.'),
-            value: settings.dataSaver,
-            onChanged: (value) => save(settings.copyWith(dataSaver: value)),
+            title: const Text('Skip intros and sponsored segments'),
+            subtitle: const Text('Uses SponsorBlock while a YouTube video plays.'),
+            value: settings.sponsorBlock,
+            onChanged: (value) => save(settings.copyWith(sponsorBlock: value)),
+          ),
+          SwitchListTile(
+            title: const Text('Move the cover'),
+            subtitle: const Text('A slow pan when a song has no Canvas clip.'),
+            value: settings.canvasMotion,
+            onChanged: (value) => save(settings.copyWith(canvasMotion: value)),
           ),
           SwitchListTile(
             title: const Text('Keep a cache'),
+            subtitle: const Text('Streams you have heard can play offline.'),
             value: settings.cacheYoutube,
             onChanged: (value) => save(settings.copyWith(cacheYoutube: value)),
           ),
@@ -147,6 +169,30 @@ class SettingsScreen extends ConsumerWidget {
               }
             },
           ),
+          const _Heading('Discord'),
+          const Text(
+            'Phone apps cannot set the Discord profile badge. If you paste a webhook you created, Forgemusic updates one message in that channel with the song you are hearing.',
+          ),
+          const SizedBox(height: 8),
+          _WebhookField(
+            initial: settings.discordWebhook,
+            onSubmit: (value) => save(settings.copyWith(discordWebhook: value, discordShare: value.trim().isNotEmpty && settings.discordShare)),
+          ),
+          SwitchListTile(
+            title: const Text('Post what is playing'),
+            subtitle: const Text('Edits the same channel message instead of sending a new one each song.'),
+            value: settings.discordShare,
+            onChanged: (value) {
+              if (value && !discordWebhookAllowed(settings.discordWebhook)) {
+                showForgeMessage(
+                  context,
+                  'Paste a Discord channel webhook first. The profile badge stays off.',
+                );
+                return;
+              }
+              save(settings.copyWith(discordShare: value));
+            },
+          ),
           const SizedBox(height: 12),
           const Text('Forgemusic 1.0'),
         ],
@@ -167,6 +213,48 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
     return ok ?? false;
+  }
+}
+
+class _WebhookField extends StatefulWidget {
+  const _WebhookField({required this.initial, required this.onSubmit});
+
+  final String initial;
+  final ValueChanged<String> onSubmit;
+
+  @override
+  State<_WebhookField> createState() => _WebhookFieldState();
+}
+
+class _WebhookFieldState extends State<_WebhookField> {
+  late final TextEditingController _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void didUpdateWidget(_WebhookField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initial != oldWidget.initial && widget.initial != _controller.text) {
+      _controller.text = widget.initial;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      obscureText: true,
+      decoration: const InputDecoration(
+        labelText: 'Channel webhook',
+        hintText: 'https://discord.com/api/webhooks/…',
+      ),
+      onSubmitted: widget.onSubmit,
+      onEditingComplete: () => widget.onSubmit(_controller.text),
+    );
   }
 }
 

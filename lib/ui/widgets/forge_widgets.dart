@@ -162,7 +162,8 @@ class SongTile extends StatelessWidget {
       ),
       title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
-        subtitle ?? '${track.artist} · ${formatDuration(track.duration)}',
+        subtitle ??
+            '${track.artist} · ${formatDuration(track.duration)}${track.downloaded ? ' · On this phone' : ''}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

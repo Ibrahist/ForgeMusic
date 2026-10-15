@@ -1,7 +1,11 @@
 package com.forgemusic.forgemusic
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.ContentUris
 import android.media.AudioManager
+import android.os.Build
 import android.provider.MediaStore
 import android.view.WindowManager
 import com.ryanheise.audioservice.AudioServiceActivity
@@ -36,6 +40,12 @@ class MainActivity : AudioServiceActivity() {
                         } else {
                             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         }
+                        result.success(null)
+                    }
+                    "notify" -> {
+                        val title = call.argument<String>("title") ?: "Forgemusic"
+                        val body = call.argument<String>("body") ?: ""
+                        postArtistNote(title, body)
                         result.success(null)
                     }
                     else -> result.notImplemented()
@@ -107,7 +117,33 @@ class MainActivity : AudioServiceActivity() {
         manager.setStreamVolume(AudioManager.STREAM_MUSIC, level, 0)
     }
 
+    private fun postArtistNote(title: String, body: String) {
+        val manager = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                ARTIST_CHANNEL,
+                "Artist alerts",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            )
+            channel.description = "New songs and uploads from artists you follow"
+            manager.createNotificationChannel(channel)
+        }
+        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, ARTIST_CHANNEL)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setAutoCancel(true)
+            .build()
+        manager.notify(title.hashCode(), notification)
+    }
+
     companion object {
         private const val CHANNEL = "com.forgemusic/device"
+        private const val ARTIST_CHANNEL = "com.forgemusic.artists"
     }
 }

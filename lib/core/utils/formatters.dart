@@ -16,6 +16,20 @@ String formatRemaining(Duration total, Duration position) {
   return '-${formatDuration(left)}';
 }
 
+String formatCount(int value) {
+  final sign = value < 0 ? '-' : '';
+  final abs = value.abs();
+  if (abs < 1000) return '$value';
+  if (abs < 1000000) {
+    final scaled = abs / 1000;
+    final text = scaled >= 10 ? scaled.toStringAsFixed(0) : scaled.toStringAsFixed(1);
+    return '$sign${text.replaceAll(RegExp(r'\.0$'), '')}K';
+  }
+  final scaled = abs / 1000000;
+  final text = scaled >= 10 ? scaled.toStringAsFixed(0) : scaled.toStringAsFixed(1);
+  return '$sign${text.replaceAll(RegExp(r'\.0$'), '')}M';
+}
+
 String formatBytes(int bytes) {
   if (bytes < 1024) return '$bytes B';
   if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';

@@ -4,6 +4,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import '../../core/app_failure.dart';
 import '../../core/utils/stream_choice.dart';
+import '../models/app_settings.dart';
 import '../models/media.dart';
 import 'lyrics_client.dart';
 
@@ -62,7 +63,7 @@ class YoutubeService {
     }
   }
 
-  Future<ChosenStream> chooseAudio(String videoId, {required bool dataSaver}) async {
+  Future<ChosenStream> chooseAudio(String videoId, {required AudioQuality quality}) async {
     final manifest = await _manifest(videoId);
     if (manifest.audioOnly.isEmpty) {
       throw AppFailure('This video has no audio stream to play.');
@@ -76,10 +77,34 @@ class YoutubeService {
             ),
           )
           .toList(),
-      dataSaver: dataSaver,
-      maxBits: dataSaver ? 64000 : null,
+      dataSaver: quality.capsBitrate,
+      maxBits: quality.maxBits,
     );
     return ChosenStream(info: chosen, audioOnly: true, hls: false);
+  }
+
+  /// The newest public upload for an artist name, used to baseline a follow.
+  Future<({String? channelId, String? videoId, String? title})> newestUpload(String artist) async {
+    final trimmed = artist.trim();
+    if (trimmed.isEmpty) return (channelId: null, videoId: null, title: null);
+    try {
+      final page = await _yt.search.search(trimmed);
+      if (page.isEmpty) return (channelId: null, videoId: null, title: null);
+      return newestByChannel(page.first.channelId.value);
+    } catch (_) {
+      return (channelId: null, videoId: null, title: null);
+    }
+  }
+
+  Future<({String? channelId, String? videoId, String? title})> newestByChannel(String channelId) async {
+    try {
+      final uploads = await _yt.channels.getUploadsFromPage(channelId);
+      if (uploads.isEmpty) return (channelId: channelId, videoId: null, title: null);
+      final video = uploads.first;
+      return (channelId: channelId, videoId: video.id.value, title: video.title);
+    } catch (_) {
+      return (channelId: channelId, videoId: null, title: null);
+    }
   }
 
   Future<ChosenStream> chooseVideo(String videoId, {required bool dataSaver}) async {

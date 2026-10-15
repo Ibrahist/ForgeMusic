@@ -17,7 +17,7 @@ class AppDatabase {
     final dir = await getDatabasesPath();
     final database = await openDatabase(
       p.join(dir, 'forgemusic.db'),
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE tracks (
@@ -126,6 +126,10 @@ class AppDatabase {
             duration_ms INTEGER NOT NULL
           )
         ''');
+        await _createExtras(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await _createExtras(db);
       },
     );
     return AppDatabase(database);
@@ -459,4 +463,60 @@ class AppDatabase {
   Future<void> deleteDownload(String id) {
     return _db.delete('downloads', where: 'id = ?', whereArgs: [id]);
   }
+
+  Future<List<ArtistFollow>> follows() async {
+    final rows = await _db.query('follows', orderBy: 'name COLLATE NOCASE');
+    return rows.map(ArtistFollow.fromMap).toList();
+  }
+
+  Future<void> upsertFollow(ArtistFollow follow) {
+    return _db.insert(
+      'follows',
+      follow.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteFollow(String name) {
+    return _db.delete('follows', where: 'name = ?', whereArgs: [name]);
+  }
+
+  Future<String?> canvasPath(String trackId) async {
+    final rows = await _db.query(
+      'canvases',
+      where: 'track_id = ?',
+      whereArgs: [trackId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['path'] as String?;
+  }
+
+  Future<void> setCanvas(String trackId, String path) {
+    return _db.insert('canvases', {
+      'track_id': trackId,
+      'path': path,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> clearCanvas(String trackId) {
+    return _db.delete('canvases', where: 'track_id = ?', whereArgs: [trackId]);
+  }
+}
+
+Future<void> _createExtras(Database db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS follows (
+      name TEXT PRIMARY KEY,
+      channel_id TEXT,
+      last_video_id TEXT,
+      last_checked_ms INTEGER
+    )
+  ''');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS canvases (
+      track_id TEXT PRIMARY KEY,
+      path TEXT NOT NULL
+    )
+  ''');
 }

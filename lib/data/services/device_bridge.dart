@@ -46,4 +46,10 @@ class DeviceBridge {
       await _channel.invokeMethod<void>('setKeepScreenOn', {'on': on});
     } catch (_) {}
   }
+
+  Future<void> notify({required String title, required String body}) async {
+    try {
+      await _channel.invokeMethod<void>('notify', {'title': title, 'body': body});
+    } catch (_) {}
+  }
 }

@@ -11,9 +11,12 @@ import '../data/models/library.dart';
 import '../data/models/media.dart';
 import '../data/models/playlist.dart';
 import '../data/models/track.dart';
+import '../data/services/artist_alerts.dart';
 import '../data/services/artwork_store.dart';
 import '../data/services/device_bridge.dart';
+import '../data/services/dislike_client.dart';
 import '../data/services/download_manager.dart';
+import '../data/services/sponsor_client.dart';
 import '../data/services/library_scanner.dart';
 import '../data/services/lyrics_client.dart';
 import '../data/services/media_resolver.dart';
@@ -63,6 +66,18 @@ final playerProvider = Provider<ForgeAudioHandler>((ref) {
 });
 
 final deviceProvider = Provider<DeviceBridge>((ref) => DeviceBridge());
+
+final sponsorProvider = Provider<SponsorClient>((ref) => SponsorClient());
+
+final dislikeProvider = Provider<DislikeClient>((ref) => DislikeClient());
+
+final artistAlertsProvider = Provider<ArtistAlerts>((ref) {
+  return ArtistAlerts(
+    ref.watch(databaseProvider),
+    ref.watch(youtubeProvider),
+    ref.watch(deviceProvider),
+  );
+});
 
 final lyricsProvider = Provider<LyricsClient>((ref) => LyricsClient());
 
@@ -153,6 +168,13 @@ class LibraryController extends Notifier<LibraryState> {
       scanning: scanning ?? state.scanning,
       message: clearMessage ? null : (message ?? state.message),
     );
+    unawaited(_noteArtists(tracks));
+  }
+
+  Future<void> _noteArtists(List<Track> tracks) async {
+    try {
+      await ref.read(artistAlertsProvider).check(tracks);
+    } catch (_) {}
   }
 
   Future<void> scan() async {

@@ -20,6 +20,7 @@ class ResolvedMedia {
     this.cacheVideoId,
     this.cacheKind,
     this.cacheStream,
+    this.bitsPerSecond,
   });
 
   final Uri uri;
@@ -28,6 +29,10 @@ class ResolvedMedia {
   final String? cacheVideoId;
   final String? cacheKind;
   final ChosenStream? cacheStream;
+  final int? bitsPerSecond;
+
+  bool get onDevice =>
+      filePath != null || uri.scheme == 'file' || uri.scheme == 'content';
 
   AudioSource get source {
     final path = filePath;
@@ -52,13 +57,13 @@ class MediaResolver {
     if (track.source == TrackSource.local) {
       final location = track.path;
       if (location != null && location.startsWith('content:')) {
-        return ResolvedMedia(uri: Uri.parse(location));
+        return ResolvedMedia(uri: Uri.parse(location), bitsPerSecond: track.bitrate);
       }
       final file = track.filePath ?? location;
       if (file == null || file.isEmpty) {
         throw AppFailure('This song has no file to play.');
       }
-      return ResolvedMedia(uri: Uri.file(file), filePath: file);
+      return ResolvedMedia(uri: Uri.file(file), filePath: file, bitsPerSecond: track.bitrate);
     }
     final videoId = track.youtubeId;
     if (videoId == null || videoId.isEmpty) {
@@ -66,14 +71,22 @@ class MediaResolver {
     }
     final download = await _db.downloadFor(videoId, audioOnly: true);
     if (download != null && await File(download.filePath).exists()) {
-      return ResolvedMedia(uri: Uri.file(download.filePath), filePath: download.filePath);
+      return ResolvedMedia(
+        uri: Uri.file(download.filePath),
+        filePath: download.filePath,
+        bitsPerSecond: track.bitrate,
+      );
     }
-    final kind = settings.dataSaver ? 'audio-saver' : 'audio';
+    final kind = settings.audioQuality.cacheKind;
     final cached = await _db.cacheEntry(videoId, kind);
     final cachedFile = cached?.filePath;
     if (cachedFile != null && await File(cachedFile).exists()) {
       await _db.touchCache(videoId, kind);
-      return ResolvedMedia(uri: Uri.file(cachedFile), filePath: cachedFile);
+      return ResolvedMedia(
+        uri: Uri.file(cachedFile),
+        filePath: cachedFile,
+        bitsPerSecond: track.bitrate,
+      );
     }
     if (cached != null && cached.urlFresh && cached.streamUrl != null) {
       await _db.touchCache(videoId, kind);
@@ -82,9 +95,10 @@ class MediaResolver {
         headers: streamHeaders,
         cacheVideoId: videoId,
         cacheKind: kind,
+        bitsPerSecond: track.bitrate,
       );
     }
-    final chosen = await _youtube.chooseAudio(videoId, dataSaver: settings.dataSaver);
+    final chosen = await _youtube.chooseAudio(videoId, quality: settings.audioQuality);
     await _downloads.rememberUrl(
       videoId: videoId,
       kind: kind,
@@ -98,6 +112,7 @@ class MediaResolver {
       cacheVideoId: settings.cacheYoutube ? videoId : null,
       cacheKind: kind,
       cacheStream: settings.cacheYoutube ? chosen : null,
+      bitsPerSecond: chosen.info.bitrate.bitsPerSecond,
     );
   }
 

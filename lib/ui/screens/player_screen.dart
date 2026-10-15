@@ -7,12 +7,13 @@ import 'package:go_router/go_router.dart';
 import 'package:palette_generator/palette_generator.dart';
 
 import '../../core/utils/formatters.dart';
-import '../../core/utils/lrc.dart';
 import '../../data/models/track.dart';
 import '../../player/player_snapshot.dart';
 import '../../state/providers.dart';
 import '../theme/forge_theme.dart';
+import '../widgets/canvas_stage.dart';
 import '../widgets/forge_widgets.dart';
+import '../widgets/synced_lyrics.dart';
 import '../playback.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -24,6 +25,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   String? _paintedId;
+  bool _lyricsOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -48,11 +50,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Center(child: _Cover(track: track)),
+                  Center(child: CanvasStage(track: track)),
                   const SizedBox(height: 26),
                   Text(track.title, style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 4),
                   Text(track.artist),
+                  if (snapshot.offline) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Playing from this phone',
+                      style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                    ),
+                  ] else if (snapshot.streamBits != null && snapshot.streamBits! > 0) ...[
+                    const SizedBox(height: 6),
+                    Text('${(snapshot.streamBits! / 1000).round()} kbps'),
+                  ],
                   const SizedBox(height: 18),
                   WaveformSeekBar(
                     seed: track.id,
@@ -122,14 +134,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       ),
                       const Spacer(),
                       TextButton.icon(
-                        onPressed: () => fetchLyrics(context, ref, track),
+                        onPressed: () {
+                          if (track.hasLyrics) {
+                            setState(() => _lyricsOpen = !_lyricsOpen);
+                          } else {
+                            fetchLyrics(context, ref, track);
+                          }
+                        },
                         icon: const Icon(Icons.lyrics_outlined),
-                        label: const Text('Lyrics'),
+                        label: Text(_lyricsOpen ? 'Hide lyrics' : 'Lyrics'),
                       ),
+                      if (track.hasLyrics)
+                        IconButton(
+                          tooltip: 'Find lyrics',
+                          onPressed: () => fetchLyrics(context, ref, track),
+                          icon: const Icon(Icons.travel_explore),
+                        ),
                     ],
                   ),
                   if (snapshot.buffering) const LinearProgressIndicator(),
-                  _Lyrics(track: track, position: snapshot.position),
+                  SyncedLyricsView(
+                    synced: track.syncedLyrics,
+                    plain: track.lyrics,
+                    position: snapshot.position,
+                    expanded: _lyricsOpen,
+                  ),
                 ],
               ),
       ),
@@ -197,69 +226,4 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 }
 
-class _Cover extends StatelessWidget {
-  const _Cover({required this.track});
 
-  final Track track;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.28),
-            blurRadius: 36,
-            offset: const Offset(0, 18),
-          ),
-        ],
-      ),
-      child: ArtworkView(path: track.artworkPath, url: track.thumbnailUrl, size: 320, radius: 28),
-    );
-  }
-}
-
-class _Lyrics extends StatelessWidget {
-  const _Lyrics({required this.track, required this.position});
-
-  final Track track;
-  final Duration position;
-
-  @override
-  Widget build(BuildContext context) {
-    final synced = track.syncedLyrics;
-    if (synced != null && synced.trim().isNotEmpty) {
-      final lines = LrcParser.parse(synced);
-      if (lines.isNotEmpty) {
-        final current = LrcParser.indexAt(lines, position);
-        return Column(
-          children: [
-            for (var i = 0; i < lines.length; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(
-                  lines[i].text,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: i == current ? Theme.of(context).colorScheme.primary : ForgeColors.mist,
-                  ),
-                ),
-              ),
-          ],
-        );
-      }
-    }
-    final plain = track.lyrics;
-    if (plain == null || plain.trim().isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 12),
-        child: Text('Lyrics will sit here once they are found.'),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Text(plain, textAlign: TextAlign.center),
-    );
-  }
-}

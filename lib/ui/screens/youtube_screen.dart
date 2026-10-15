@@ -125,7 +125,7 @@ class _YoutubeScreenState extends ConsumerState<YoutubeScreen> {
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 4, 20, 10),
               child: Text(
-                'For personal listening. Please respect copyright and YouTube’s terms. Downloads stay on this phone.',
+                'Dislike counts are estimates from Return YouTube Dislike. For personal listening. Please respect copyright and YouTube’s terms. Downloads stay on this phone.',
               ),
             ),
           ],
@@ -145,7 +145,13 @@ class _YoutubeScreenState extends ConsumerState<YoutubeScreen> {
         return ListTile(
           leading: ArtworkView(url: hit.thumbnailUrl, radius: 12),
           title: Text(hit.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-          subtitle: Text('${hit.author} · ${formatDuration(hit.duration)}'),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${hit.author} · ${formatDuration(hit.duration)}'),
+              _VoteLine(videoId: hit.videoId),
+            ],
+          ),
           onTap: () => settings.youtubeAudioOnly ? _play(hit) : _watch(hit),
           trailing: PopupMenuButton<String>(
             onSelected: (value) {
@@ -189,7 +195,7 @@ class _YoutubeScreenState extends ConsumerState<YoutubeScreen> {
         return ListTile(
           leading: ArtworkView(url: item.thumbnailUrl, radius: 12),
           title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text('${item.audioOnly ? 'Audio' : 'Video'} · ${formatBytes(item.bytes)}'),
+          subtitle: Text('${item.audioOnly ? 'Audio' : 'Video'} · ${formatBytes(item.bytes)} · On this phone'),
           onTap: () => item.audioOnly ? _play(hit, path: item.filePath) : _watch(hit),
           trailing: IconButton(
             icon: const Icon(Icons.delete_outline),
@@ -223,12 +229,49 @@ class _YoutubeScreenState extends ConsumerState<YoutubeScreen> {
   Future<void> _save(YoutubeHit hit, {required bool audioOnly}) async {
     try {
       final settings = ref.read(settingsProvider);
-      await ref.read(downloadsProvider).download(hit, audioOnly: audioOnly, dataSaver: settings.dataSaver);
+      await ref.read(downloadsProvider).download(
+        hit,
+        audioOnly: audioOnly,
+        audioQuality: settings.audioQuality,
+        dataSaver: settings.dataSaver,
+      );
       await _reloadSaved();
       if (mounted) showForgeMessage(context, 'Saved on this phone.');
     } catch (error) {
       if (!mounted) return;
       showForgeMessage(context, error is AppFailure ? error.message : 'That download stopped before it finished.');
     }
+  }
+}
+
+class _VoteLine extends ConsumerStatefulWidget {
+  const _VoteLine({required this.videoId});
+
+  final String videoId;
+
+  @override
+  ConsumerState<_VoteLine> createState() => _VoteLineState();
+}
+
+class _VoteLineState extends ConsumerState<_VoteLine> {
+  String? _label;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final votes = await ref.read(dislikeProvider).votes(widget.videoId);
+    if (!mounted || votes == null) return;
+    setState(() => _label = '${formatCount(votes.likes)} likes · ${formatCount(votes.dislikes)} dislikes');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _label;
+    if (label == null) return const SizedBox.shrink();
+    return Text(label, style: Theme.of(context).textTheme.bodySmall);
   }
 }

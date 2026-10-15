@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/library.dart';
@@ -29,6 +30,7 @@ class ShelfScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(title),
         actions: [
+          if (kind == ShelfKind.artist && group != null) _FollowButton(name: group.title),
           if (kind == ShelfKind.folder && group?.folder != null)
             IconButton(
               tooltip: 'Folder art',
@@ -108,6 +110,57 @@ class ShelfScreen extends ConsumerWidget {
     await ref.read(databaseProvider).setFolder(path: folder.path, artworkPath: saved);
     ref.read(libraryBusProvider).ping();
     if (context.mounted) showForgeMessage(context, 'Folder art updated.');
+  }
+}
+
+class _FollowButton extends ConsumerStatefulWidget {
+  const _FollowButton({required this.name});
+
+  final String name;
+
+  @override
+  ConsumerState<_FollowButton> createState() => _FollowButtonState();
+}
+
+class _FollowButtonState extends ConsumerState<_FollowButton> {
+  bool _on = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final on = await ref.read(artistAlertsProvider).isFollowing(widget.name);
+    if (mounted) setState(() => _on = on);
+  }
+
+  Future<void> _toggle() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final alerts = ref.read(artistAlertsProvider);
+    if (_on) {
+      await alerts.unfollow(widget.name);
+      if (mounted) showForgeMessage(context, 'Artist alerts are off for ${widget.name}.');
+    } else {
+      await Permission.notification.request();
+      await alerts.follow(widget.name);
+      if (mounted) {
+        showForgeMessage(context, 'Forgemusic will tell you when ${widget.name} posts something new.');
+      }
+    }
+    await _load();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: _busy ? null : _toggle,
+      child: Text(_on ? 'Following' : 'Follow'),
+    );
   }
 }
 

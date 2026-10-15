@@ -12,13 +12,17 @@ import '../core/app_failure.dart';
 import '../core/stream_agent.dart';
 import '../core/utils/crossfade.dart';
 import '../core/utils/replay_gain.dart';
+import '../core/utils/skip_window.dart';
 import '../data/db/app_database.dart';
 import '../data/library_bus.dart';
 import '../data/models/app_settings.dart';
+import '../data/models/library.dart';
 import '../data/models/playlist.dart';
 import '../data/models/track.dart';
+import '../data/services/discord_presence.dart';
 import '../data/services/download_manager.dart';
 import '../data/services/media_resolver.dart';
+import '../data/services/sponsor_client.dart';
 import 'player_snapshot.dart';
 
 class _Deck {
@@ -30,6 +34,8 @@ class _Deck {
   GainPlan gain = GainPlan.unity;
   String? videoId;
   String? kind;
+  bool offline = false;
+  int? bits;
 }
 
 /// Plays the queue, keeps a notification, and hands songs across with a fade.
@@ -56,7 +62,15 @@ class ForgeAudioHandler extends BaseAudioHandler {
   final LibraryBus _bus;
   final MediaResolver _resolver;
   final DownloadManager _downloads;
+  final SponsorClient _sponsor = SponsorClient();
+  final DiscordPresence _discord = DiscordPresence();
   AppSettings _settings;
+  List<SkipSegment> _segments = const [];
+  String? _segmentFor;
+  Duration? _skipArmedUntil;
+  Duration? _previousPosition;
+  String? _presenceTrack;
+  bool? _presencePlaying;
 
   late final _Deck _left;
   late final _Deck _right;
@@ -144,32 +158,34 @@ class ForgeAudioHandler extends BaseAudioHandler {
   }
 
   Future<void> playTracks(List<Track> tracks, {int index = 0}) {
-    return _sync(() async {
-      if (tracks.isEmpty) return;
-      await prepare();
-      await _askNotification();
-      await _cancelFade();
-      for (final track in tracks) {
-        if (track.source == TrackSource.youtube) await _db.upsertTrack(track);
-      }
+    return _sync(() => _playLoaded(tracks, index));
+  }
+
+  Future<void> _playLoaded(List<Track> tracks, int index) async {
+    if (tracks.isEmpty) return;
+    await prepare();
+    await _askNotification();
+    await _cancelFade();
+    for (final track in tracks) {
+      if (track.source == TrackSource.youtube) await _db.upsertTrack(track);
+    }
+    _queue
+      ..clear()
+      ..addAll(tracks);
+    _index = index.clamp(0, tracks.length - 1);
+    if (_shuffle) {
+      final chosen = _queue[_index];
+      final rest = [..._queue]..removeAt(_index);
+      rest.shuffle(math.Random());
       _queue
         ..clear()
-        ..addAll(tracks);
-      _index = index.clamp(0, _queue.length - 1);
-      if (_shuffle) {
-        final chosen = _queue[_index];
-        final rest = [..._queue]..removeAt(_index);
-        rest.shuffle(math.Random());
-        _queue
-          ..clear()
-          ..add(chosen)
-          ..addAll(rest);
-        _index = 0;
-        _linearIds = tracks.map((track) => track.id).toList();
-        _shuffleDirty = false;
-      }
-      await _startCurrent(play: true);
-    });
+        ..add(chosen)
+        ..addAll(rest);
+      _index = 0;
+      _linearIds = tracks.map((track) => track.id).toList();
+      _shuffleDirty = false;
+    }
+    await _startCurrent(play: true);
   }
 
   Future<void> enqueue(List<Track> tracks) {
@@ -475,7 +491,19 @@ class ForgeAudioHandler extends BaseAudioHandler {
     _retried = false;
     _message = null;
     _preloadedIndex = null;
+    _segments = const [];
+    _segmentFor = null;
+    _skipArmedUntil = null;
+    _previousPosition = null;
     await _open(_live, _queue[_index], play: play);
+    final current = _queue[_index];
+    final videoId = current.youtubeId;
+    if (_settings.sponsorBlock &&
+        current.source == TrackSource.youtube &&
+        videoId != null &&
+        videoId.isNotEmpty) {
+      unawaited(_loadSegments(videoId));
+    }
     _playing = play;
     if (play) _startClock();
     _broadcast();
@@ -499,6 +527,8 @@ class ForgeAudioHandler extends BaseAudioHandler {
       deck.track = track;
       deck.videoId = resolved.cacheVideoId ?? track.youtubeId;
       deck.kind = resolved.cacheKind;
+      deck.offline = resolved.onDevice;
+      deck.bits = resolved.bitsPerSecond;
       deck.gain = GainPlan.resolve(
         replayGainDb: track.replayGainDb,
         enabled: _settings.normalize,
@@ -679,6 +709,7 @@ class ForgeAudioHandler extends BaseAudioHandler {
         unawaited(_db.addHistory(id).then((_) => _bus.ping()));
       }
     }
+    _considerSponsor();
     if (_fading) _advanceFade();
     final now = DateTime.now();
     if (_playing &&
@@ -940,8 +971,11 @@ class ForgeAudioHandler extends BaseAudioHandler {
         sleepEndsAt: _sleepEnds,
         sleepEndOfTrack: _sleepEndOfTrack,
         message: _message,
+        offline: _live.track != null && _live.offline,
+        streamBits: _live.bits,
       ),
     );
+    if (structural) _sharePresence();
     final now = DateTime.now();
     if (!structural &&
         _lastService != null &&
@@ -978,5 +1012,146 @@ class ForgeAudioHandler extends BaseAudioHandler {
         errorMessage: _message,
       ),
     );
+  }
+
+  void _considerSponsor() {
+    if (!_playing || !_settings.sponsorBlock || _fading || _loading) return;
+    final videoId = _live.track?.youtubeId;
+    if (videoId == null || _segmentFor != videoId) return;
+    final previous = _previousPosition;
+    final jumpedBack = previous != null && _position + const Duration(seconds: 1) < previous;
+    _previousPosition = _position;
+    if (jumpedBack) _skipArmedUntil = null;
+    final armed = _skipArmedUntil;
+    if (armed != null && _position < armed) return;
+    _skipArmedUntil = null;
+    final jump = nextSkip(_segments, _position);
+    if (jump == null) return;
+    _skipArmedUntil = jump;
+    unawaited(seek(jump));
+  }
+
+  Future<void> _loadSegments(String videoId) async {
+    final found = await _sponsor.segments(videoId);
+    if (_live.track?.youtubeId != videoId) return;
+    _segments = found;
+    _segmentFor = videoId;
+  }
+
+  void _sharePresence() {
+    final track = _live.track;
+    final webhook = _settings.discordWebhook;
+    if (!_settings.discordShare || webhook.trim().isEmpty || track == null) return;
+    if (_presenceTrack == track.id && _presencePlaying == _playing) return;
+    _presenceTrack = track.id;
+    _presencePlaying = _playing;
+    unawaited(
+      _discord.update(
+        webhook: webhook,
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        playing: _playing,
+      ),
+    );
+  }
+
+  @override
+  Future<List<MediaItem>> getChildren(String parentMediaId, [Map<String, dynamic>? options]) async {
+    if (parentMediaId == AudioService.browsableRootId) {
+      return const [
+        MediaItem(id: 'forge:songs', title: 'Songs', playable: false),
+        MediaItem(id: 'forge:albums', title: 'Albums', playable: false),
+        MediaItem(id: 'forge:playlists', title: 'Playlists', playable: false),
+      ];
+    }
+    if (parentMediaId == 'forge:songs') {
+      return (await _db.allTracks()).map(_item).toList();
+    }
+    if (parentMediaId == 'forge:albums') {
+      final albums = groupAlbums(await _db.allTracks());
+      return [
+        for (final album in albums)
+          MediaItem(
+            id: 'forge:album:${album.key}',
+            title: album.name,
+            artist: album.artist,
+            playable: false,
+          ),
+      ];
+    }
+    if (parentMediaId.startsWith('forge:album:')) {
+      final key = parentMediaId.substring('forge:album:'.length);
+      final album = groupAlbums(await _db.allTracks()).where((item) => item.key == key).firstOrNull;
+      if (album == null) return const [];
+      return album.tracks.map(_item).toList();
+    }
+    if (parentMediaId == 'forge:playlists') {
+      final lists = await _db.playlists();
+      return [
+        for (final playlist in lists)
+          MediaItem(id: 'forge:playlist:${playlist.id}', title: playlist.name, playable: false),
+      ];
+    }
+    if (parentMediaId.startsWith('forge:playlist:')) {
+      final id = parentMediaId.substring('forge:playlist:'.length);
+      return (await _db.playlistTracks(id)).map(_item).toList();
+    }
+    return const [];
+  }
+
+  @override
+  Future<void> playFromMediaId(String mediaId, [Map<String, dynamic>? extras]) {
+    return _sync(() async {
+      if (mediaId == 'forge:songs') {
+        final tracks = await _db.allTracks();
+        if (tracks.isEmpty) return;
+        await _playLoaded(tracks, 0);
+        return;
+      }
+      if (mediaId.startsWith('forge:album:')) {
+        final key = mediaId.substring('forge:album:'.length);
+        final album = groupAlbums(await _db.allTracks()).where((item) => item.key == key).firstOrNull;
+        if (album == null || album.tracks.isEmpty) return;
+        await _playLoaded(album.tracks, 0);
+        return;
+      }
+      if (mediaId.startsWith('forge:playlist:')) {
+        final id = mediaId.substring('forge:playlist:'.length);
+        final tracks = await _db.playlistTracks(id);
+        if (tracks.isEmpty) return;
+        await _playLoaded(tracks, 0);
+        return;
+      }
+      final track = await _db.trackById(mediaId);
+      if (track == null) return;
+      if (track.source == TrackSource.local && track.album.trim().isNotEmpty) {
+        final artist = track.albumArtist.trim().isEmpty ? track.artist : track.albumArtist;
+        final album = groupAlbums(await _db.allTracks())
+            .where((item) => item.name == track.album && item.artist == artist)
+            .firstOrNull;
+        if (album != null && album.tracks.isNotEmpty) {
+          final index = album.tracks.indexWhere((item) => item.id == track.id);
+          await _playLoaded(album.tracks, index < 0 ? 0 : index);
+          return;
+        }
+      }
+      await _playLoaded([track], 0);
+    });
+  }
+
+  @override
+  Future<List<MediaItem>> search(String query, [Map<String, dynamic>? extras]) async {
+    final needle = query.trim().toLowerCase();
+    if (needle.isEmpty) return const [];
+    final tracks = await _db.allTracks();
+    return tracks
+        .where(
+          (track) =>
+              track.title.toLowerCase().contains(needle) || track.artist.toLowerCase().contains(needle),
+        )
+        .take(50)
+        .map(_item)
+        .toList();
   }
 }

@@ -177,3 +177,34 @@ class VideoLaunch {
   final String? youtubeId;
   final bool dataSaver;
 }
+
+/// An artist the listener asked to hear about.
+class ArtistFollow {
+  const ArtistFollow({
+    required this.name,
+    this.channelId,
+    this.lastVideoId,
+    this.lastCheckedMs,
+  });
+
+  final String name;
+  final String? channelId;
+  final String? lastVideoId;
+  final int? lastCheckedMs;
+
+  factory ArtistFollow.fromMap(Map<String, Object?> map) {
+    return ArtistFollow(
+      name: map['name']! as String,
+      channelId: map['channel_id'] as String?,
+      lastVideoId: map['last_video_id'] as String?,
+      lastCheckedMs: (map['last_checked_ms'] as num?)?.toInt(),
+    );
+  }
+
+  Map<String, Object?> toMap() => {
+    'name': name,
+    'channel_id': channelId,
+    'last_video_id': lastVideoId,
+    'last_checked_ms': lastCheckedMs,
+  };
+}
