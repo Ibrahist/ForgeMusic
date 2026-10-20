@@ -41,17 +41,16 @@ class ResolvedMedia {
     if (stream != null && stream.hls) {
       return HlsAudioSource(uri, headers: headers);
     }
-    return ProgressiveAudioSource(uri, headers: headers);
+    return AudioSource.uri(uri, headers: headers);
   }
 }
 
 /// Picks a local file, a saved download, the cache, or a fresh stream.
 class MediaResolver {
-  MediaResolver(this._db, this._youtube, this._downloads);
+  MediaResolver(this._db, this._youtube, [DownloadManager? _]);
 
   final AppDatabase _db;
   final YoutubeService _youtube;
-  final DownloadManager _downloads;
 
   Future<ResolvedMedia> resolveAudio(Track track, AppSettings settings) async {
     if (track.source == TrackSource.local) {
@@ -88,27 +87,9 @@ class MediaResolver {
         bitsPerSecond: track.bitrate,
       );
     }
-    if (cached != null && cached.urlFresh && cached.streamUrl != null) {
-      await _db.touchCache(videoId, kind);
-      return ResolvedMedia(
-        uri: Uri.parse(cached.streamUrl!),
-        headers: streamHeaders,
-        cacheVideoId: videoId,
-        cacheKind: kind,
-        bitsPerSecond: track.bitrate,
-      );
-    }
     final chosen = await _youtube.chooseAudio(videoId, quality: settings.audioQuality);
-    await _downloads.rememberUrl(
-      videoId: videoId,
-      kind: kind,
-      url: chosen.url.toString(),
-      filePath: cachedFile,
-      bytes: cached?.bytes ?? 0,
-    );
     return ResolvedMedia(
       uri: chosen.url,
-      headers: streamHeaders,
       cacheVideoId: settings.cacheYoutube ? videoId : null,
       cacheKind: kind,
       cacheStream: settings.cacheYoutube ? chosen : null,

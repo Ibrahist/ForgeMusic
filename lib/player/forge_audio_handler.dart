@@ -9,7 +9,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../core/app_failure.dart';
-import '../core/stream_agent.dart';
 import '../core/utils/crossfade.dart';
 import '../core/utils/replay_gain.dart';
 import '../core/utils/skip_window.dart';
@@ -121,10 +120,8 @@ class ForgeAudioHandler extends BaseAudioHandler {
     final enhancer = AndroidLoudnessEnhancer();
     final equalizer = AndroidEqualizer();
     final player = AudioPlayer(
-      userAgent: streamUserAgent,
       handleInterruptions: false,
       handleAudioSessionActivation: false,
-      useProxyForRequestHeaders: false,
       audioPipeline: AudioPipeline(androidAudioEffects: [equalizer, enhancer]),
     );
     return _Deck(player, enhancer, equalizer);
@@ -187,6 +184,8 @@ class ForgeAudioHandler extends BaseAudioHandler {
       _linearIds = tracks.map((track) => track.id).toList();
       _shuffleDirty = false;
     }
+    _live.track = _queue[_index];
+    _broadcast();
     await _startCurrent(play: true);
   }
 
@@ -521,7 +520,15 @@ class ForgeAudioHandler extends BaseAudioHandler {
     _segmentFor = null;
     _skipArmedUntil = null;
     _previousPosition = null;
-    await _open(_live, _queue[_index], play: play);
+    _live.track = _queue[_index];
+    _broadcast();
+    try {
+      await _open(_live, _queue[_index], play: play);
+    } catch (e) {
+      _message = e is AppFailure ? e.message : 'Could not play this track.';
+      _publish(structural: true);
+      rethrow;
+    }
     final current = _queue[_index];
     final videoId = current.youtubeId;
     if (_settings.sponsorBlock &&
@@ -543,7 +550,9 @@ class ForgeAudioHandler extends BaseAudioHandler {
     required bool play,
     double level = 1,
   }) async {
+    deck.track = track;
     _loading = true;
+    _publish(structural: true);
     try {
       final resolved = await _resolver.resolveAudio(track, _settings);
       await deck.player.setAudioSource(
@@ -685,7 +694,7 @@ class ForgeAudioHandler extends BaseAudioHandler {
     if (_failing) return;
     _failing = true;
     try {
-      final track = _live.track;
+      final track = _live.track ?? (_queue.isNotEmpty ? _queue[_index] : null);
       if (track != null && track.source == TrackSource.youtube && !_retried) {
         _retried = true;
         final kind = _live.kind;

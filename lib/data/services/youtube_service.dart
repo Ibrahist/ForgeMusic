@@ -65,22 +65,39 @@ class YoutubeService {
 
   Future<ChosenStream> chooseAudio(String videoId, {required AudioQuality quality}) async {
     final manifest = await _manifest(videoId);
-    if (manifest.audioOnly.isEmpty) {
-      throw AppFailure('This video has no audio stream to play.');
+    final audioOnly = manifest.audioOnly.toList();
+    if (audioOnly.isNotEmpty) {
+      final chosen = pickPreferred(
+        audioOnly
+            .map(
+              (stream) => RatedStream(
+                value: stream,
+                bitsPerSecond: stream.bitrate.bitsPerSecond,
+              ),
+            )
+            .toList(),
+        dataSaver: quality.capsBitrate,
+        maxBits: quality.maxBits,
+      );
+      return ChosenStream(info: chosen, audioOnly: true, hls: false);
     }
-    final chosen = pickPreferred(
-      manifest.audioOnly
-          .map(
-            (stream) => RatedStream(
-              value: stream,
-              bitsPerSecond: stream.bitrate.bitsPerSecond,
-            ),
-          )
-          .toList(),
-      dataSaver: quality.capsBitrate,
-      maxBits: quality.maxBits,
-    );
-    return ChosenStream(info: chosen, audioOnly: true, hls: false);
+    final muxed = manifest.muxed.toList();
+    if (muxed.isNotEmpty) {
+      final chosen = pickPreferred(
+        muxed
+            .map(
+              (stream) => RatedStream(
+                value: stream,
+                bitsPerSecond: stream.bitrate.bitsPerSecond,
+              ),
+            )
+            .toList(),
+        dataSaver: quality.capsBitrate,
+        maxBits: quality.maxBits,
+      );
+      return ChosenStream(info: chosen, audioOnly: false, hls: false);
+    }
+    throw AppFailure('This YouTube video has no playable audio streams.');
   }
 
   /// The newest public upload for an artist name, used to baseline a follow.

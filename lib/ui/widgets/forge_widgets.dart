@@ -483,10 +483,14 @@ class MiniPlayer extends ConsumerWidget {
                       ),
                     ),
                     PlayingBars(playing: snapshot.playing, height: 18),
-                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Previous',
+                      onPressed: () => ref.read(playerProvider).skipToPrevious(),
+                      icon: const Icon(Icons.skip_previous_rounded),
+                    ),
                     PlayToggleButton(
                       playing: snapshot.playing,
-                      size: 48,
+                      size: 44,
                       onPressed: () {
                         final player = ref.read(playerProvider);
                         if (snapshot.playing) {
