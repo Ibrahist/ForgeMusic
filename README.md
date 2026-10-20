@@ -7,6 +7,7 @@ ForgeMusic is a Flutter-powered Android media player designed to bring local mus
 [![Flutter](https://img.shields.io/badge/Flutter-Powered-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://www.android.com/)
 [![Language](https://img.shields.io/badge/Language-Dart-0175C2?logo=dart&logoColor=white)](https://dart.dev/)
+[![License: GPL v3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Status](https://img.shields.io/badge/Status-In%20Development-orange)](https://github.com/Ibrahist/Forgemusic)
 
 ## ✨ Features
@@ -200,4 +201,25 @@ Include relevant error messages, reproduction steps, and your Android and Flutte
 
 ## 📄 License
 
-Please refer to the repository for licensing information. No specific license is stated in this README.
+This project is licensed under the **GNU General Public License v3.0 (GPL v3.0)**.
+
+See the [LICENSE](LICENSE) file for the full license text.
+
+<details>
+<summary><b>📜 GNU General Public License v3.0 (GPL v3.0) — Click to view details</b></summary>
+
+### Overview
+
+ForgeMusic is free and open-source software: you can redistribute it and/or modify it under the terms of the **GNU General Public License** as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but **WITHOUT ANY WARRANTY**; without even the implied warranty of **MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE**. See the [GNU General Public License](https://www.gnu.org/licenses/gpl-3.0.html) for more details.
+
+| Permissions | Conditions | Limitations |
+| :--- | :--- | :--- |
+| ✅ Commercial use | ℹ️ Disclose source | ❌ Liability |
+| ✅ Distribution | ℹ️ License and copyright notice | ❌ Warranty |
+| ✅ Modification | ℹ️ State changes | |
+| ✅ Patent use | ℹ️ Same license (GPL-3.0) | |
+| ✅ Private use | | |
+
+</details>
